@@ -1,0 +1,916 @@
+<!DOCTYPE html>
+
+<html>
+<head>
+  <title>libdeck.js</title>
+  <meta http-equiv="content-type" content="text/html; charset=UTF-8">
+  <meta name="viewport" content="width=device-width, target-densitydpi=160dpi, initial-scale=1.0; maximum-scale=1.0; user-scalable=0;">
+  <link rel="stylesheet" media="all" href="docco.css" />
+</head>
+<body>
+  <div id="container">
+    <div id="background"></div>
+    
+    <ul class="sections">
+        
+          <li id="title">
+              <div class="annotation">
+                  <h1>libdeck.js</h1>
+              </div>
+          </li>
+        
+        
+        
+        <li id="section-1">
+            <div class="annotation">
+              
+              <div class="pilwrap ">
+                <a class="pilcrow" href="#section-1">&#182;</a>
+              </div>
+              <p>We&#39;ve lacked a good social data model for do-ables.</p>
+<p>LibDeck is a plain-as-dirt representation scheme for tracking things that an individual or
+multiple people could do, possibly together or possibly apart, possibly specifying locations, timeframes or
+interdependencies, possibly with some network of supporting connections, like
+chatrooms, mentorships, etc.</p>
+<p>LibDeck is also an API and server framework for collaborating on sets of activities that
+conform to the model.</p>
+<p>Example applications go beyond todo lists and company task lists and include
+lists of favorite cafes, weekend planning for a group, foursquare venues,
+(do-able via checkin), project managements, complex team coordination, volunteer
+opportunities, etc.</p>
+<p>We&#39;ve lacked a lightweight representation scheme for these
+things until now.</p>
+<p>Here are the basic concepts.</p>
+<h1>API</h1>
+
+            </div>
+            
+            <div class="content"><div class='highlight'><pre>module.deck = <span class="keyword">function</span>(){</pre></div></div>
+            
+        </li>
+        
+        
+        <li id="section-2">
+            <div class="annotation">
+              
+              <div class="pilwrap for-h2">
+                <a class="pilcrow" href="#section-2">&#182;</a>
+              </div>
+              <h2>Idea</h2>
+<p>A do-able.  <em>Representation:</em> a POJO of the form {title:&quot;&quot;, ID:&quot;&quot;}
+call Deck.idea({}) to turn a POJO into one with the following methods:</p>
+
+            </div>
+            
+            <div class="content"><div class='highlight'><pre>	<span class="keyword">var</span> Idea = {
+		type: <span class="string">'idea'</span>,</pre></div></div>
+            
+        </li>
+        
+        
+        <li id="section-3">
+            <div class="annotation">
+              
+              <div class="pilwrap for-h3">
+                <a class="pilcrow" href="#section-3">&#182;</a>
+              </div>
+              <h3>state</h3>
+<p>do we have something going on with this idea already?</p>
+
+            </div>
+            
+            <div class="content"><div class='highlight'><pre>		state: <span class="keyword">function</span>(){
+			<span class="keyword">if</span> (<span class="keyword">this</span>.successes().length)              <span class="keyword">return</span> <span class="string">'done'</span>;
+			<span class="keyword">if</span> (<span class="keyword">this</span>.confirmables().length)           <span class="keyword">return</span> <span class="string">'confirmable'</span>;
+			<span class="keyword">if</span> (<span class="keyword">this</span>.plans().length)                  <span class="keyword">return</span> <span class="string">'plan'</span>;  <span class="comment">// 'planned'</span>
+			<span class="keyword">if</span> (<span class="keyword">this</span>.invites().length)                <span class="keyword">return</span> <span class="string">'invited'</span>;
+			<span class="keyword">if</span> (<span class="keyword">this</span>.interest().shared_with().length) <span class="keyword">return</span> <span class="string">'sugg'</span>;  <span class="comment">// 'interested'</span>
+			<span class="keyword">return</span> <span class="string">'idea'</span>;  <span class="comment">// 'inactive'</span>
+		},</pre></div></div>
+            
+        </li>
+        
+        
+        <li id="section-4">
+            <div class="annotation">
+              
+              <div class="pilwrap for-h3">
+                <a class="pilcrow" href="#section-4">&#182;</a>
+              </div>
+              <h3>interest</h3>
+<p>am I interested in doing it?</p>
+
+            </div>
+            
+            <div class="content"><div class='highlight'><pre>		interest: <span class="keyword">function</span>(){
+			<span class="keyword">var</span> s = <span class="keyword">this</span>.__.shouts.id(shout_id(<span class="keyword">this</span>.__, <span class="keyword">this</span>.ID));
+			<span class="keyword">if</span> (s &amp;&amp; !last_2wks(s.updated_at)) s = <span class="literal">null</span>;
+			<span class="keyword">return</span> newobj(<span class="keyword">this</span>.__, Interest, {
+				idea: <span class="keyword">this</span>,
+				shout: s,
+				when: s &amp;&amp; s.t &amp;&amp; s.t[<span class="number">0</span>]
+			});
+		},</pre></div></div>
+            
+        </li>
+        
+        
+        <li id="section-5">
+            <div class="annotation">
+              
+              <div class="pilwrap for-h3">
+                <a class="pilcrow" href="#section-5">&#182;</a>
+              </div>
+              <h3>invites</h3>
+<p>has anyone invited me?</p>
+
+            </div>
+            
+            <div class="content"><div class='highlight'><pre>		invites: <span class="keyword">function</span>(){
+			<span class="keyword">var</span> __ = <span class="keyword">this</span>.__, self = <span class="keyword">this</span>;
+			__.shouts.get();
+			<span class="keyword">var</span> ss = __.shouts.indexes.by_orig[<span class="keyword">this</span>.ID];
+			<span class="keyword">if</span> (!ss || !ss.length) <span class="keyword">return</span> [];
+			<span class="keyword">var</span> plans = <span class="keyword">this</span>.plans();
+
+			<span class="keyword">return</span> ss.filter(<span class="keyword">function</span>(s){
+				<span class="keyword">if</span> (!last_2wks(s.updated_at)) <span class="keyword">return</span>;
+				<span class="keyword">if</span> (s.from == __.myid()) <span class="keyword">return</span>;
+				<span class="keyword">if</span> (plans.some(<span class="keyword">function</span>(p){ <span class="keyword">return</span> p.cohost() == s.from; })) <span class="keyword">return</span>;
+				<span class="keyword">return</span> <span class="literal">true</span>;
+			}).map(<span class="keyword">function</span>(s){
+				<span class="keyword">return</span> newobj(__, Invite, { shout: s, idea: self });
+			});
+		},</pre></div></div>
+            
+        </li>
+        
+        
+        <li id="section-6">
+            <div class="annotation">
+              
+              <div class="pilwrap for-h3">
+                <a class="pilcrow" href="#section-6">&#182;</a>
+              </div>
+              <h3>plans</h3>
+<p>do I have plans for a certain day already?</p>
+
+            </div>
+            
+            <div class="content"><div class='highlight'><pre>		plans: <span class="keyword">function</span>(){
+			<span class="keyword">return</span> compact(<span class="keyword">this</span>.chatrooms().map(<span class="keyword">function</span>(r){ <span class="keyword">return</span> r.plan(); }));
+		},</pre></div></div>
+            
+        </li>
+        
+        
+        <li id="section-7">
+            <div class="annotation">
+              
+              <div class="pilwrap for-h3">
+                <a class="pilcrow" href="#section-7">&#182;</a>
+              </div>
+              <h3>chatrooms</h3>
+<p>are we chatting about this idea with any groups?</p>
+
+            </div>
+            
+            <div class="content"><div class='highlight'><pre>		chatrooms: <span class="keyword">function</span>(){
+			<span class="keyword">var</span> __ = <span class="keyword">this</span>.__, self = <span class="keyword">this</span>;
+			__.chatrooms.get();
+			<span class="keyword">var</span> rooms = <span class="keyword">this</span>.__.chatrooms.indexes.by_orig[<span class="keyword">this</span>.ID];
+			<span class="keyword">if</span> (!rooms) <span class="keyword">return</span> [];
+			<span class="keyword">return</span> sort_by(rooms, <span class="string">'updated_at'</span>).map(<span class="keyword">function</span>(r){
+				<span class="keyword">if</span> (!r.entries) r.entries = [];
+				<span class="keyword">return</span> newobj(__, Chatroom, { room: r, idea: self });
+			});
+		},</pre></div></div>
+            
+        </li>
+        
+        
+        <li id="section-8">
+            <div class="annotation">
+              
+              <div class="pilwrap for-h3">
+                <a class="pilcrow" href="#section-8">&#182;</a>
+              </div>
+              <h3>episodes</h3>
+<p>episodes can be chatrooms, invites, or interest
+they have others(), chats(), ts(), timeframe(), path(), type</p>
+
+            </div>
+            
+            <div class="content"><div class='highlight'><pre>		episodes: <span class="keyword">function</span>(){
+			<span class="keyword">var</span> episodes = <span class="keyword">this</span>.chatrooms();
+			<span class="keyword">var</span> paths = setify(episodes.map(<span class="keyword">function</span>(r){ <span class="keyword">return</span> r.room.ID; }));
+			<span class="keyword">var</span> interest = <span class="keyword">this</span>.interest();
+			<span class="keyword">if</span> (!<span class="keyword">this</span>.plans().length &amp;&amp; <span class="keyword">this</span>.interest().shared_with().length &amp;&amp; !paths[interest.path()]){
+				episodes.push(interest);
+			}
+			<span class="keyword">this</span>.invites().forEach(<span class="keyword">function</span>(i){
+				<span class="keyword">if</span> (!paths[i.path()]) episodes.push(i);
+			});
+			<span class="keyword">return</span> sort_by(episodes, <span class="keyword">function</span>(x){ <span class="keyword">return</span> x.ts(); });
+		},</pre></div></div>
+            
+        </li>
+        
+        
+        <li id="section-9">
+            <div class="annotation">
+              
+              <div class="pilwrap for-h3">
+                <a class="pilcrow" href="#section-9">&#182;</a>
+              </div>
+              <h3>chatroom(who)</h3>
+<p>return a chatroom about this idea with those people in it</p>
+
+            </div>
+            
+            <div class="content"><div class='highlight'><pre>		chatroom: <span class="keyword">function</span>(ID, who){
+			<span class="keyword">var</span> already;
+			<span class="keyword">if</span> (ID){
+				already = <span class="keyword">this</span>.chatrooms().filter(<span class="keyword">function</span>(r){ <span class="keyword">return</span> r.room.ID == ID; })[<span class="number">0</span>];
+				<span class="keyword">if</span> (already) <span class="keyword">return</span> already;
+			} <span class="keyword">else</span> {
+				already = <span class="keyword">this</span>.matching_chatroom(who);
+				<span class="keyword">if</span> (already) <span class="keyword">return</span> already;
+				ID = <span class="keyword">this</span>.__.myid() + <span class="string">'_'</span> + <span class="keyword">this</span>.ID + <span class="string">'_'</span> + (<span class="keyword">new</span> Date().getTime() / <span class="number">1000</span>);
+			}
+			<span class="keyword">if</span> (!who) <span class="keyword">return</span>;
+			<span class="keyword">return</span> newobj(<span class="keyword">this</span>.__, Chatroom, {
+				idea: <span class="keyword">this</span>,
+				room: {
+					ID: ID,
+					to: uniq(who.concat([<span class="keyword">this</span>.__.myid()])),
+					orig: <span class="keyword">this</span>.ID,
+					ideas: [<span class="keyword">this</span>.orig_idea],
+					entries: []
+				}
+			});
+		},</pre></div></div>
+            
+        </li>
+        
+        
+        <li id="section-10">
+            <div class="annotation">
+              
+              <div class="pilwrap for-h3">
+                <a class="pilcrow" href="#section-10">&#182;</a>
+              </div>
+              <h3>matching_chatroom(who)</h3>
+<p>return a chatroom about this idea with those people in it, if there&#39;s one</p>
+
+            </div>
+            
+            <div class="content"><div class='highlight'><pre>		matching_chatroom: <span class="keyword">function</span>(who){
+			<span class="keyword">var</span> already = <span class="keyword">this</span>.chatrooms().filter(<span class="keyword">function</span>(r){
+				<span class="keyword">return</span> set_equal(r.room.to, who);
+			})[<span class="number">0</span>];
+			<span class="keyword">if</span> (already) <span class="keyword">return</span> already;
+		},</pre></div></div>
+            
+        </li>
+        
+        
+        <li id="section-11">
+            <div class="annotation">
+              
+              <div class="pilwrap for-h3">
+                <a class="pilcrow" href="#section-11">&#182;</a>
+              </div>
+              <h3>default_chatroom</h3>
+<p>the default chatroom for chatting right now about this idea</p>
+
+            </div>
+            
+            <div class="content"><div class='highlight'><pre>		default_chatroom: <span class="keyword">function</span>(){
+			<span class="keyword">var</span> rooms = <span class="keyword">this</span>.chatrooms();
+			<span class="keyword">if</span> (rooms.length) <span class="keyword">return</span> rooms[<span class="number">0</span>];
+			<span class="keyword">var</span> interest = <span class="keyword">this</span>.interest();
+			<span class="keyword">if</span> (interest.shared()) <span class="keyword">return</span> interest.chatroom();
+
+			<span class="keyword">var</span> invites = <span class="keyword">this</span>.invites();
+			<span class="keyword">if</span> (invites.length != <span class="number">1</span>) <span class="keyword">return</span> <span class="keyword">this</span>.chatroom(<span class="literal">null</span>, [<span class="keyword">this</span>.__.myid()]);
+			<span class="keyword">return</span> invites[<span class="number">0</span>].chatroom();
+		},</pre></div></div>
+            
+        </li>
+        
+        
+        <li id="section-12">
+            <div class="annotation">
+              
+              <div class="pilwrap for-h3">
+                <a class="pilcrow" href="#section-12">&#182;</a>
+              </div>
+              <h3>confirmables</h3>
+
+            </div>
+            
+            <div class="content"><div class='highlight'><pre>		confirmables: <span class="keyword">function</span>(){
+			<span class="keyword">return</span> [];
+		},</pre></div></div>
+            
+        </li>
+        
+        
+        <li id="section-13">
+            <div class="annotation">
+              
+              <div class="pilwrap for-h3">
+                <a class="pilcrow" href="#section-13">&#182;</a>
+              </div>
+              <h3>successes</h3>
+
+            </div>
+            
+            <div class="content"><div class='highlight'><pre>		successes: <span class="keyword">function</span>(){
+			<span class="keyword">return</span> [];
+		}
+	};</pre></div></div>
+            
+        </li>
+        
+        
+        <li id="section-14">
+            <div class="annotation">
+              
+              <div class="pilwrap for-h2">
+                <a class="pilcrow" href="#section-14">&#182;</a>
+              </div>
+              <h2>Interests</h2>
+
+            </div>
+            
+            <div class="content"><div class='highlight'><pre>	<span class="keyword">var</span> Interest = {
+		type: <span class="string">'interest'</span>,
+		path: <span class="keyword">function</span>(){ <span class="keyword">return</span> <span class="keyword">this</span>.idea.ID + <span class="string">'/interest/'</span> + <span class="keyword">this</span>.__.myid(); },</pre></div></div>
+            
+        </li>
+        
+        
+        <li id="section-15">
+            <div class="annotation">
+              
+              <div class="pilwrap for-h3">
+                <a class="pilcrow" href="#section-15">&#182;</a>
+              </div>
+              <h3>shared?</h3>
+
+            </div>
+            
+            <div class="content"><div class='highlight'><pre>		shared: <span class="keyword">function</span>(){
+			<span class="keyword">return</span> <span class="keyword">this</span>.shared_with().length;
+		},</pre></div></div>
+            
+        </li>
+        
+        
+        <li id="section-16">
+            <div class="annotation">
+              
+              <div class="pilwrap for-h3">
+                <a class="pilcrow" href="#section-16">&#182;</a>
+              </div>
+              <h3>matching_chatroom</h3>
+
+            </div>
+            
+            <div class="content"><div class='highlight'><pre>		matching_chatroom: <span class="keyword">function</span>(){
+			<span class="keyword">var</span> already = <span class="keyword">this</span>.idea.chatroom(<span class="keyword">this</span>.path());
+			<span class="keyword">if</span> (already) <span class="keyword">return</span> already;
+			<span class="keyword">return</span> <span class="keyword">this</span>.idea.matching_chatroom([<span class="keyword">this</span>.__.myid()].concat(<span class="keyword">this</span>.shared_with()));
+		},
+
+		chats: <span class="keyword">function</span>(){
+			<span class="keyword">var</span> room = <span class="keyword">this</span>.matching_chatroom();
+			<span class="keyword">return</span> room ? room.chats() : [];
+		},
+
+		ts: <span class="keyword">function</span>(){
+			<span class="keyword">var</span> chats = <span class="keyword">this</span>.chats();
+			<span class="keyword">if</span> (!chats || !chats.length) <span class="keyword">return</span> <span class="keyword">this</span>.shout.updated_at;
+			<span class="keyword">return</span> Math.max(<span class="keyword">this</span>.shout.updated_at, chats[chats.length-<span class="number">1</span>].at);
+		},</pre></div></div>
+            
+        </li>
+        
+        
+        <li id="section-17">
+            <div class="annotation">
+              
+              <div class="pilwrap for-h3">
+                <a class="pilcrow" href="#section-17">&#182;</a>
+              </div>
+              <h3>chatroom</h3>
+
+            </div>
+            
+            <div class="content"><div class='highlight'><pre>		chatroom: <span class="keyword">function</span>(){
+			<span class="keyword">return</span> <span class="keyword">this</span>.matching_chatroom() || <span class="keyword">this</span>.idea.chatroom(<span class="keyword">this</span>.path(), [<span class="keyword">this</span>.__.myid()].concat(<span class="keyword">this</span>.shared_with()));
+		},
+
+		timeframe: <span class="keyword">function</span>(tf){
+			<span class="keyword">if</span> (!tf) <span class="keyword">return</span> <span class="keyword">this</span>.shout &amp;&amp; <span class="keyword">this</span>.shout.t &amp;&amp; <span class="keyword">this</span>.shout.t[<span class="number">0</span>];
+			<span class="keyword">if</span> (<span class="keyword">this</span>.shout){
+				<span class="keyword">this</span>.shout.t = [tf];
+				<span class="keyword">this</span>.__.shouts.save(<span class="keyword">this</span>.shout);
+			} <span class="keyword">else</span> {
+				<span class="keyword">this</span>.__.shouts.add({
+					ID: shout_id(<span class="keyword">this</span>.__, <span class="keyword">this</span>.idea.pack, <span class="keyword">this</span>.idea.ID),
+					t: [tf],
+					to: [<span class="keyword">this</span>.__.myid()],
+					pack: <span class="keyword">this</span>.idea.pack,
+					orig: <span class="keyword">this</span>.idea.ID,
+					ideas: [<span class="keyword">this</span>.idea.orig_idea]
+				});
+			}
+		},</pre></div></div>
+            
+        </li>
+        
+        
+        <li id="section-18">
+            <div class="annotation">
+              
+              <div class="pilwrap for-h3">
+                <a class="pilcrow" href="#section-18">&#182;</a>
+              </div>
+              <h3>share(who, when)</h3>
+
+            </div>
+            
+            <div class="content"><div class='highlight'><pre>		share: <span class="keyword">function</span>(who, r){
+			who = [].concat(who);
+
+			<span class="keyword">if</span> (<span class="keyword">this</span>.shout){
+				<span class="keyword">var</span> room = <span class="keyword">this</span>.matching_chatroom();
+				<span class="keyword">if</span> (!set_minus(who, <span class="keyword">this</span>.shout.to).length){
+					<span class="keyword">if</span> (!r || (<span class="keyword">this</span>.shout.t &amp;&amp; <span class="keyword">this</span>.shout.t[<span class="number">0</span>] == r)) <span class="keyword">return</span>;
+				}
+				<span class="keyword">this</span>.shout.to = uniq(<span class="keyword">this</span>.shout.to.concat(who));
+				<span class="keyword">if</span> (r) <span class="keyword">this</span>.shout.t = [r];
+				<span class="keyword">this</span>.__.shouts.save(<span class="keyword">this</span>.shout);
+				<span class="keyword">if</span> (room) room.add(<span class="keyword">this</span>.shout.to);
+			} <span class="keyword">else</span> {
+				<span class="keyword">this</span>.__.shouts.add({
+					ID: shout_id(<span class="keyword">this</span>.__, <span class="keyword">this</span>.idea.pack, <span class="keyword">this</span>.idea.ID),
+					t: r &amp;&amp; [r],
+					to: who.concat([<span class="keyword">this</span>.__.myid()]),
+					pack: <span class="keyword">this</span>.idea.pack,
+					orig: <span class="keyword">this</span>.idea.ID,
+					ideas: [<span class="keyword">this</span>.idea.orig_idea]
+				});
+			}
+
+		},</pre></div></div>
+            
+        </li>
+        
+        
+        <li id="section-19">
+            <div class="annotation">
+              
+              <div class="pilwrap for-h3">
+                <a class="pilcrow" href="#section-19">&#182;</a>
+              </div>
+              <h3>shared_with</h3>
+
+            </div>
+            
+            <div class="content"><div class='highlight'><pre>		shared_with: <span class="keyword">function</span>(){
+			<span class="keyword">if</span> (!<span class="keyword">this</span>.shout) <span class="keyword">return</span> [];
+			<span class="keyword">return</span> set_minus(<span class="keyword">this</span>.shout.to, [<span class="keyword">this</span>.__.myid()]);
+		},
+
+		others: <span class="keyword">function</span>(){
+			<span class="keyword">return</span> <span class="keyword">this</span>.shared_with();
+		},</pre></div></div>
+            
+        </li>
+        
+        
+        <li id="section-20">
+            <div class="annotation">
+              
+              <div class="pilwrap for-h3">
+                <a class="pilcrow" href="#section-20">&#182;</a>
+              </div>
+              <h3>link(for_who)</h3>
+
+            </div>
+            
+            <div class="content"><div class='highlight'><pre>		link: <span class="keyword">function</span>(who){
+			<span class="keyword">var</span> ID = shout_id(<span class="keyword">this</span>.__, <span class="keyword">this</span>.idea.pack, <span class="keyword">this</span>.idea.ID);
+			<span class="keyword">if</span> (!<span class="keyword">this</span>.shout) <span class="keyword">return</span> <span class="string">"http://bright-ideas.co/m0_"</span> + ID;
+			<span class="keyword">var</span> place = <span class="keyword">this</span>.shout.to.indexOf(who);
+			<span class="keyword">if</span> (!~place) place = <span class="keyword">this</span>.shout.to.length;
+			<span class="keyword">return</span> <span class="string">"http://bright-ideas.co/m"</span> + place + <span class="string">"_"</span> + ID;
+		}
+	};</pre></div></div>
+            
+        </li>
+        
+        
+        <li id="section-21">
+            <div class="annotation">
+              
+              <div class="pilwrap for-h2">
+                <a class="pilcrow" href="#section-21">&#182;</a>
+              </div>
+              <h2>Invites</h2>
+
+            </div>
+            
+            <div class="content"><div class='highlight'><pre>	<span class="keyword">var</span> Invite = {
+		type: <span class="string">'invite'</span>,</pre></div></div>
+            
+        </li>
+        
+        
+        <li id="section-22">
+            <div class="annotation">
+              
+              <div class="pilwrap for-h3">
+                <a class="pilcrow" href="#section-22">&#182;</a>
+              </div>
+              <h3>path</h3>
+
+            </div>
+            
+            <div class="content"><div class='highlight'><pre>		path: <span class="keyword">function</span>(){ <span class="keyword">return</span> <span class="keyword">this</span>.idea.ID + <span class="string">'/interest/'</span> + <span class="keyword">this</span>.shout.from; },
+
+		others: <span class="keyword">function</span>(){
+			<span class="keyword">return</span> [<span class="keyword">this</span>.shout.from];
+		},</pre></div></div>
+            
+        </li>
+        
+        
+        <li id="section-23">
+            <div class="annotation">
+              
+              <div class="pilwrap for-h3">
+                <a class="pilcrow" href="#section-23">&#182;</a>
+              </div>
+              <h3>chatroom</h3>
+
+            </div>
+            
+            <div class="content"><div class='highlight'><pre>		chatroom: <span class="keyword">function</span>(){
+			<span class="keyword">var</span> hosts = [<span class="keyword">this</span>.__.myid(), <span class="keyword">this</span>.shout.from];
+			<span class="keyword">return</span> <span class="keyword">this</span>.idea.chatroom(<span class="keyword">this</span>.path());
+		},
+
+		chats: <span class="keyword">function</span>(){
+			<span class="keyword">var</span> room = <span class="keyword">this</span>.chatroom();
+			<span class="keyword">return</span> room ? room.chats() : [];
+		},
+
+		ts: <span class="keyword">function</span>(){
+			<span class="keyword">var</span> chats = <span class="keyword">this</span>.chats();
+			<span class="keyword">if</span> (!chats || !chats.length) <span class="keyword">return</span> <span class="keyword">this</span>.shout.updated_at;
+			<span class="keyword">return</span> Math.max(<span class="keyword">this</span>.shout.updated_at, chats[chats.length-<span class="number">1</span>].at);
+		},</pre></div></div>
+            
+        </li>
+        
+        
+        <li id="section-24">
+            <div class="annotation">
+              
+              <div class="pilwrap for-h3">
+                <a class="pilcrow" href="#section-24">&#182;</a>
+              </div>
+              <h3>timeframe</h3>
+
+            </div>
+            
+            <div class="content"><div class='highlight'><pre>		timeframe: <span class="keyword">function</span>(){
+			<span class="keyword">return</span> <span class="keyword">this</span>.shout.t &amp;&amp; <span class="keyword">this</span>.shout.t[<span class="number">0</span>];
+		},</pre></div></div>
+            
+        </li>
+        
+        
+        <li id="section-25">
+            <div class="annotation">
+              
+              <div class="pilwrap for-h3">
+                <a class="pilcrow" href="#section-25">&#182;</a>
+              </div>
+              <h3>make_plan</h3>
+
+            </div>
+            
+            <div class="content"><div class='highlight'><pre>		make_plan: <span class="keyword">function</span>(){
+			<span class="keyword">if</span> (!<span class="keyword">this</span>.timeframe()) <span class="keyword">return</span> alert(<span class="string">'Can\'t make a dayless invite into a plan'</span>);
+			<span class="keyword">var</span> r = <span class="keyword">this</span>.chatroom();
+			<span class="keyword">var</span> hosts = [<span class="keyword">this</span>.__.myid(), <span class="keyword">this</span>.shout.from];
+			r.room.plan = {
+				hosts: hosts,
+				from: <span class="keyword">this</span>.__.myid(),
+				when: <span class="keyword">this</span>.timeframe()
+			};
+			<span class="keyword">this</span>.__.chatrooms.save(r.room);
+		}
+	};</pre></div></div>
+            
+        </li>
+        
+        
+        <li id="section-26">
+            <div class="annotation">
+              
+              <div class="pilwrap for-h2">
+                <a class="pilcrow" href="#section-26">&#182;</a>
+              </div>
+              <h2>Plans</h2>
+<p>A kind of activity where a quorum of people have committed to doing it.  I.e., it&#39;s scheduled or whatever.</p>
+
+            </div>
+            
+            <div class="content"><div class='highlight'><pre>	<span class="keyword">var</span> Plan = {
+		type: <span class="string">'plan'</span>,
+
+		pairing: <span class="keyword">function</span>(){
+			<span class="keyword">return</span> [ <span class="keyword">this</span>.__.myid(), <span class="keyword">this</span>.cohost() ].sort().join(<span class="string">'-'</span>);
+		},</pre></div></div>
+            
+        </li>
+        
+        
+        <li id="section-27">
+            <div class="annotation">
+              
+              <div class="pilwrap for-h3">
+                <a class="pilcrow" href="#section-27">&#182;</a>
+              </div>
+              <h3>path</h3>
+
+            </div>
+            
+            <div class="content"><div class='highlight'><pre>		path: <span class="keyword">function</span>(){
+			<span class="keyword">return</span> <span class="keyword">this</span>.idea.ID + <span class="string">'/plan/'</span> + <span class="keyword">this</span>.pairing();
+		},</pre></div></div>
+            
+        </li>
+        
+        
+        <li id="section-28">
+            <div class="annotation">
+              
+              <div class="pilwrap for-h3">
+                <a class="pilcrow" href="#section-28">&#182;</a>
+              </div>
+              <h3>cohost</h3>
+
+            </div>
+            
+            <div class="content"><div class='highlight'><pre>		cohost: <span class="keyword">function</span>(){
+			<span class="keyword">return</span> set_minus(<span class="keyword">this</span>.plan.hosts, [<span class="keyword">this</span>.__.myid()])[<span class="number">0</span>];
+		},
+
+		timeframe: <span class="keyword">function</span>(){
+			<span class="keyword">return</span> <span class="keyword">this</span>.plan.when;
+		},
+
+		cancel: <span class="keyword">function</span>(){ },
+		success: <span class="keyword">function</span>(){ }
+	};</pre></div></div>
+            
+        </li>
+        
+        
+        <li id="section-29">
+            <div class="annotation">
+              
+              <div class="pilwrap for-h2">
+                <a class="pilcrow" href="#section-29">&#182;</a>
+              </div>
+              <h2>Chatrooms</h2>
+<p>A collection of chats about an idea or activity, visible to some group</p>
+
+            </div>
+            
+            <div class="content"><div class='highlight'><pre>	<span class="keyword">var</span> Chatroom = {
+		type: <span class="string">'chatroom'</span>,
+
+		path: <span class="keyword">function</span>(){
+			<span class="keyword">return</span> <span class="keyword">this</span>.room.ID;
+		},
+
+		others: <span class="keyword">function</span>(){
+			<span class="keyword">return</span> set_minus(<span class="keyword">this</span>.room.to, [<span class="keyword">this</span>.__.myid()]);
+		},
+
+		chats: <span class="keyword">function</span>(){
+			<span class="keyword">return</span> <span class="keyword">this</span>.room.entries;
+		},
+
+		ts: <span class="keyword">function</span>(){
+			<span class="keyword">var</span> chats = <span class="keyword">this</span>.room.entries;
+			<span class="keyword">if</span> (!chats || !chats.length) <span class="keyword">return</span> <span class="number">0</span>;
+			<span class="keyword">return</span> chats[chats.length-<span class="number">1</span>].at;
+		},
+
+		timeframe: <span class="keyword">function</span>(){
+			<span class="keyword">var</span> plan = <span class="keyword">this</span>.plan();
+			<span class="keyword">if</span> (plan) <span class="keyword">return</span> plan.timeframe();
+		},</pre></div></div>
+            
+        </li>
+        
+        
+        <li id="section-30">
+            <div class="annotation">
+              
+              <div class="pilwrap ">
+                <a class="pilcrow" href="#section-30">&#182;</a>
+              </div>
+              <p>others(), chats(), day(), ts()</p>
+
+            </div>
+            
+            <div class="content"><div class='highlight'><pre>		plan: <span class="keyword">function</span>(){
+			<span class="keyword">if</span> (<span class="keyword">this</span>.room.plan) <span class="keyword">return</span> newobj(<span class="keyword">this</span>.__, Plan, {
+				idea: <span class="keyword">this</span>.idea,
+				room: <span class="keyword">this</span>,
+				plan: <span class="keyword">this</span>.room.plan
+			});
+		},</pre></div></div>
+            
+        </li>
+        
+        
+        <li id="section-31">
+            <div class="annotation">
+              
+              <div class="pilwrap for-h3">
+                <a class="pilcrow" href="#section-31">&#182;</a>
+              </div>
+              <h3>chatroom.invite (person =&gt; url)</h3>
+
+            </div>
+            
+            <div class="content"><div class='highlight'><pre>		add: <span class="keyword">function</span>(who_all){
+			<span class="keyword">this</span>.room.to = uniq(<span class="keyword">this</span>.room.to.concat(who_all));
+			<span class="keyword">this</span>.__.chatrooms.save(<span class="keyword">this</span>.room);</pre></div></div>
+            
+        </li>
+        
+        
+        <li id="section-32">
+            <div class="annotation">
+              
+              <div class="pilwrap ">
+                <a class="pilcrow" href="#section-32">&#182;</a>
+              </div>
+              <p>TODO, add an entry that says I invited them</p>
+
+            </div>
+            
+            <div class="content"><div class='highlight'><pre>		},</pre></div></div>
+            
+        </li>
+        
+        
+        <li id="section-33">
+            <div class="annotation">
+              
+              <div class="pilwrap for-h3">
+                <a class="pilcrow" href="#section-33">&#182;</a>
+              </div>
+              <h3>chatroom.post (msg)</h3>
+
+            </div>
+            
+            <div class="content"><div class='highlight'><pre>		chat: <span class="keyword">function</span>(msg){
+			<span class="keyword">if</span> (!msg || msg.match(<span class="regexp">/^\s*$/</span>)) <span class="keyword">return</span>;
+			<span class="keyword">this</span>.room.entries.push({
+				from: <span class="keyword">this</span>.__.myid(),
+				msg: msg,
+				at: (<span class="keyword">new</span> Date().getTime() / <span class="number">1000</span>)
+			});
+			<span class="keyword">this</span>.__.chatrooms.save(<span class="keyword">this</span>.room);
+		}
+	};
+
+	<span class="keyword">var</span> Config = {
+		init:<span class="keyword">function</span>(){ <span class="keyword">this</span>.idea_cache = {}; },
+		myid: <span class="keyword">function</span>(){ <span class="keyword">return</span> <span class="keyword">this</span>.uid || myid(); },
+
+		idea:<span class="keyword">function</span>(pack, obj){
+			<span class="keyword">var</span> clone = $.extend({}, obj);
+			<span class="keyword">if</span> (pack) clone.pack = pack;
+			<span class="keyword">var</span> clone2 = $.extend({}, clone);
+			clone2.orig_idea = clone;
+			<span class="keyword">return</span> <span class="keyword">this</span>.idea_cache[obj.ID] = newobj(<span class="keyword">this</span>, Idea, clone2);
+		},
+
+		lookup: <span class="keyword">function</span>(path){
+			<span class="keyword">var</span> parts = path.split(<span class="string">'/'</span>);
+			<span class="keyword">var</span> idea = <span class="keyword">this</span>.idea_cache[parts[<span class="number">0</span>]];
+			<span class="keyword">if</span> (parts[<span class="number">1</span>] == <span class="string">'interest'</span>){
+				<span class="keyword">if</span> (parts[<span class="number">2</span>] == <span class="keyword">this</span>.myid()) <span class="keyword">return</span> idea.interest();
+				<span class="keyword">return</span> idea.invites().filter(<span class="keyword">function</span>(i){
+					<span class="keyword">return</span> i.shout.from == parts[<span class="number">2</span>];
+				})[<span class="number">0</span>];
+			}
+			<span class="keyword">else</span> <span class="keyword">if</span> (parts[<span class="number">1</span>] == <span class="string">'plan'</span>) <span class="keyword">return</span> idea.plans().filter(<span class="keyword">function</span>(i){
+				<span class="keyword">return</span> i.pairing() == parts[<span class="number">2</span>];
+			})[<span class="number">0</span>];
+		},
+
+		all_invites: <span class="keyword">function</span>(){
+			<span class="keyword">var</span> __ = <span class="keyword">this</span>, ideas = [];
+			__.shouts.get();
+			<span class="keyword">for</span> (<span class="keyword">var</span> idea_id <span class="keyword">in</span> __.shouts.indexes.by_orig){
+				<span class="keyword">var</span> shouts = __.shouts.indexes.by_orig[idea_id].filter(<span class="keyword">function</span>(s){
+					<span class="keyword">return</span> s.from != __.myid();
+				});
+				<span class="keyword">if</span> (shouts.length &amp;&amp; shouts[<span class="number">0</span>].ideas) ideas.push(__.idea(<span class="literal">null</span>, shouts[<span class="number">0</span>].ideas[<span class="number">0</span>]));
+			}
+			<span class="keyword">return</span> flatten(ideas.map(<span class="keyword">function</span>(x){ <span class="keyword">return</span> x.invites(); }));
+		},
+
+		all_plans: <span class="keyword">function</span>(){</pre></div></div>
+            
+        </li>
+        
+        
+        <li id="section-34">
+            <div class="annotation">
+              
+              <div class="pilwrap ">
+                <a class="pilcrow" href="#section-34">&#182;</a>
+              </div>
+              <p>simple: all chatrooms with plans that are in the future</p>
+
+            </div>
+            
+            <div class="content"><div class='highlight'><pre>			<span class="keyword">var</span> __ = <span class="keyword">this</span>, ideas = [];
+			__.chatrooms.get();
+			<span class="keyword">for</span> (<span class="keyword">var</span> idea_id <span class="keyword">in</span> __.chatrooms.indexes.by_orig){
+				<span class="keyword">var</span> plans = __.chatrooms.indexes.by_orig[idea_id].filter(<span class="keyword">function</span>(s){ <span class="keyword">return</span> s.plan; });
+				<span class="keyword">if</span> (plans.length &amp;&amp; plans[<span class="number">0</span>].ideas) ideas.push(__.idea(<span class="literal">null</span>, plans[<span class="number">0</span>].ideas[<span class="number">0</span>]));
+			}
+			<span class="keyword">return</span> flatten(ideas.map(<span class="keyword">function</span>(x){ <span class="keyword">return</span> x.plans(); }));
+		}
+	};
+
+	<span class="function"><span class="keyword">function</span> <span class="title">shout_id</span><span class="params">(__, stack_id, idea_id)</span>{</span>
+		<span class="keyword">return</span> __.myid() + <span class="string">'_S_'</span>  + (idea_id || stack_id);
+	}
+
+	<span class="function"><span class="keyword">function</span> <span class="title">newobj</span><span class="params">(__, type, params)</span>{</span>
+		<span class="keyword">var</span> o = $.extend(Object.create(type), params);
+		o.__ = __;
+		<span class="keyword">if</span> (o.init) o.init();
+		<span class="keyword">return</span> o;
+	}
+
+	<span class="keyword">return</span> {
+		idea: <span class="keyword">function</span>(pack, obj){ <span class="keyword">return</span> <span class="keyword">this</span>.default_config().idea(pack, obj); },
+		lookup: <span class="keyword">function</span>(path){ <span class="keyword">return</span> <span class="keyword">this</span>.default_config().lookup(path); },
+		config: <span class="keyword">function</span>(params){ <span class="keyword">return</span> newobj(<span class="literal">null</span>, Config, params);},
+		default_config: <span class="keyword">function</span>(){
+			<span class="keyword">if</span> (<span class="keyword">this</span>._default_config) <span class="keyword">return</span> <span class="keyword">this</span>._default_config;
+			<span class="keyword">else</span> <span class="keyword">return</span> <span class="keyword">this</span>._default_config = <span class="keyword">this</span>.config({
+				shouts: shouts,
+				chatrooms: chatrooms
+			});
+		},
+
+		all_plans:<span class="keyword">function</span>(){ <span class="keyword">return</span> <span class="keyword">this</span>.default_config().all_plans(); },
+		all_invites:<span class="keyword">function</span>(){  <span class="keyword">return</span> <span class="keyword">this</span>.default_config().all_invites(); },
+		all_successes:<span class="keyword">function</span>(){}
+
+	};
+};
+
+
+
+<span class="keyword">var</span> shouts = collection(<span class="string">'shout'</span>, <span class="string">'v1.2'</span>, everyone_and_me, <span class="keyword">function</span>(c){
+	c.index_by(<span class="string">'orig'</span>);
+	c.index_by(<span class="string">'pack'</span>);
+	c.decorator = <span class="keyword">function</span>(x){
+		x.others = set_minus(x.to, [x.from]);
+	};
+});
+
+<span class="keyword">var</span> chatrooms = collection(<span class="string">'chatroom'</span>, <span class="string">'v1.0'</span>, just_me, <span class="keyword">function</span>(c){
+  c.index_by(<span class="string">'orig'</span>);
+});
+
+<span class="keyword">var</span> Deck = module(<span class="string">'deck'</span>);</pre></div></div>
+            
+        </li>
+        
+    </ul>
+  </div>
+</body>
+</html>
