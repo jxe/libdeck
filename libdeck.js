@@ -8,6 +8,21 @@
 // LibDeck is also an API and server framework for collaborating on sets of activities that
 // conform to the model.
 //
+// Given a JSON object like this
+// 
+//    {
+//       ID: "http://bright-ideas.co/sf.places.phil#ocean-beach"
+//       type: 'place',
+//       title: 'Ocean Beach Secret Cave',
+//       loc: [37.760568,-122.510004],
+//       guide: "Near the northern tip of Ocean Beach lies a secret entrance to the underground. 
+//         A cave waits below. On one side there is a tunnel, but only at low tide can you follow where it leads."
+//    }
+// 
+// and backend interfaces "shouts" and "chatrooms" to handle invitations and conversations, 
+// libdeck.js exposes higher level notions of who's interested, when they can plan, what plans are possible, etc.
+//
+//
 // Example applications go beyond todo lists and company task lists and include
 // lists of favorite cafes, weekend planning for a group, foursquare venues,
 // (do-able via checkin), project managements, complex team coordination, volunteer
